@@ -9,7 +9,6 @@ permissions:
 jobs:
   process:
     runs-on: ubuntu-latest
-    # ميزة الـ concurrency بتخلي العمليات تستنى بعض عشان ميحصلش خطأ في ملف الـ JSON
     concurrency: 
       group: athar-db-update
       cancel-in-progress: false
@@ -26,19 +25,20 @@ jobs:
 
       - name: Execute Logic
         env:
-          # المتغيرات اللي جاية من الـ Worker
           FILE_ID: ${{ github.event.client_payload.file_id }}
           VIDEO_TITLE: ${{ github.event.client_payload.video_title }}
           VIDEO_ID: ${{ github.event.client_payload.video_id }}
           ACTION: ${{ github.event.client_payload.action }}
+          EVENT_NAME: ${{ github.event.action }}
         run: |
-          if [ "${{ github.event.action }}" == "new_video_upload" ]; then
+          if [ "$EVENT_NAME" == "new_video_upload" ]; then
             echo "🚀 جاري إضافة فيديو جديد..."
             python update_json.py
-          elif [ "${{ github.event.action }}" == "update_like" ]; then
+          elif [ "$EVENT_NAME" == "update_like" ]; then
             echo "❤️ جاري تحديث لايكات الفيديو رقم $VIDEO_ID..."
-            # هنا بننادي على السكريبت بتاعك اللي اسمه manage_likes.py
             python manage_likes.py "$VIDEO_ID" "$ACTION"
+          else
+            echo "❓ نوع الحدث غير معروف: $EVENT_NAME"
           fi
 
       - name: Save Changes
@@ -48,7 +48,6 @@ jobs:
           git add videos.json
           git commit -m "Automated Update: ${{ github.event.action }}" || exit 0
           
-          # استراتيجية الرفع الذكي عشان لو فيه كذا أكشن شغالين ورا بعض
           for i in {1..5}; do
             git pull --rebase -X theirs origin main && git push && break || sleep 10;
           done
