@@ -9,15 +9,20 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
-    # هذا الجزء هو سر الحل: يمنع تداخل الأكشنات ويجعلها تعمل بالتتالي
+    # هنا التعديل: بنسمح بفتح عمليتين مع بعض (Parallel)
+    # والـ group بيضمن إنهم تبع نفس الطابور
     concurrency: 
       group: update-json
-      cancel-in-progress: false 
+      cancel-in-progress: false
+
+    # دي الإضافة اللي بتتحكم في عدد العمليات المتوازية
+    strategy:
+      max-parallel: 2
 
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0 # مهم جداً لجلب كل التاريخ ومنع التعارض
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -36,10 +41,10 @@ jobs:
           git config --global user.email 'action@github.com'
           
           git add videos.json
-          # إذا لم يوجد تغيير فعلي، لا يتوقف الأكشن
-          git commit -m "Auto-update videos.json: ${{ github.event.client_payload.title }}" || exit 0
+          git commit -m "Auto-update: ${{ github.event.client_payload.title }}" || exit 0
           
-          # استراتيجية الرفع الذكي: يحاول الرفع 5 مرات مع انتظار 10 ثوانٍ لو حصلت زحمة
+          # استراتيجية الرفع "المقاتلة":
+          # بيعمل pull ودمج أوتوماتيكي (theirs) عشان لو العملية التانية سبقت في الرفع
           for i in {1..5}; do
-            git pull --rebase -X theirs origin main && git push && break || sleep 10;
+            git pull --rebase -X theirs origin main && git push && break || sleep 15;
           done
