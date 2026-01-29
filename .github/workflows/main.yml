@@ -1,0 +1,29 @@
+name: Update Video JSON
+on:
+  repository_dispatch:
+    types: [new_video] # نفس الاسم اللي في الـ Worker
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: setup-python@v4
+        with:
+          python-version: '3.x'
+          
+      - name: Run Update Script
+        env:
+          FILE_ID: ${{ github.event.client_payload.file_id }}
+          VIDEO_TITLE: ${{ github.event.client_payload.title }}
+        run: python update_json.py
+        
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name 'GitHub Action'
+          git config --global user.email 'action@github.com'
+          git add videos.json
+          git commit -m "Auto-update videos.json: ${{ github.event.client_payload.title }}"
+          git push
