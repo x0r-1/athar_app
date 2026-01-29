@@ -1,0 +1,29 @@
+name: Update Video Likes
+
+on:
+  repository_dispatch:
+    types: [update_like]
+
+jobs:
+  update-likes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Run Like Script
+        run: |
+          python manage_likes.py ${{ github.event.client_payload.video_id }} ${{ github.event.client_payload.action }}
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "Athar-Bot"
+          git config --global user.email "bot@athar.com"
+          git add videos.json
+          git commit -m "Update likes for video ${{ github.event.client_payload.video_id }}"
+          git push
