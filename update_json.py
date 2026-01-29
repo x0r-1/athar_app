@@ -7,7 +7,8 @@ def update_json():
     file_id = os.getenv('FILE_ID')
     title = os.getenv('VIDEO_TITLE')
     # رابط الـ Worker بتاعك (Proxy)
-    worker_url = "https://yellow-wind-75bb.ahhaga123456789.workers.dev/?file_id="
+    # التعديل: أضفنا ?file_id= في نهاية الرابط
+worker_url = "https://yellow-wind-75bb.ahhaga123456789.workers.dev/?file_id="
     
     file_path = 'videos.json'
 
