@@ -1,17 +1,17 @@
-name: Update Video JSON
+name: Athar App Unified Handler
 on:
   repository_dispatch:
-    # لازم النوعين دول عشان الـ Worker بيبعتهم
     types: [new_video_upload, update_like]
 
 permissions:
   contents: write
 
 jobs:
-  update:
+  process:
     runs-on: ubuntu-latest
+    # ميزة الـ concurrency بتخلي العمليات تستنى بعض عشان ميحصلش خطأ في ملف الـ JSON
     concurrency: 
-      group: update-json
+      group: athar-db-update
       cancel-in-progress: false
 
     steps:
@@ -23,29 +23,32 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
-          
-      - name: Run Update Script
+
+      - name: Execute Logic
         env:
-          # هنا التعديل: الأسماء لازم تطابق الـ client_payload اللي في الـ Worker
+          # المتغيرات اللي جاية من الـ Worker
           FILE_ID: ${{ github.event.client_payload.file_id }}
           VIDEO_TITLE: ${{ github.event.client_payload.video_title }}
           VIDEO_ID: ${{ github.event.client_payload.video_id }}
           ACTION: ${{ github.event.client_payload.action }}
         run: |
           if [ "${{ github.event.action }}" == "new_video_upload" ]; then
+            echo "🚀 جاري إضافة فيديو جديد..."
             python update_json.py
-          else
-            python update_video_likes.py "$VIDEO_ID" "$ACTION"
+          elif [ "${{ github.event.action }}" == "update_like" ]; then
+            echo "❤️ جاري تحديث لايكات الفيديو رقم $VIDEO_ID..."
+            # هنا بننادي على السكريبت بتاعك اللي اسمه manage_likes.py
+            python manage_likes.py "$VIDEO_ID" "$ACTION"
           fi
-        
-      - name: Commit and Push changes
+
+      - name: Save Changes
         run: |
-          git config --global user.name 'GitHub Action'
-          git config --global user.email 'action@github.com'
-          
+          git config --global user.name 'Athar Bot'
+          git config --global user.email 'bot@athar.com'
           git add videos.json
-          git commit -m "Auto-update: ${{ github.event.action }}" || exit 0
+          git commit -m "Automated Update: ${{ github.event.action }}" || exit 0
           
+          # استراتيجية الرفع الذكي عشان لو فيه كذا أكشن شغالين ورا بعض
           for i in {1..5}; do
-            git pull --rebase -X theirs origin main && git push && break || sleep 15;
+            git pull --rebase -X theirs origin main && git push && break || sleep 10;
           done
