@@ -12,7 +12,6 @@ def update_json():
     captions_path = 'captions.json'
 
     # 2. تحديد الوصف (من تليجرام أو عشوائي)
-    # نتحقق إذا كان الوصف القادم من العامل (Worker) فارغاً أو جملة تلقائية
     is_empty = not telegram_caption or telegram_caption.strip() == "" or "فيديو جديد من أثر" in telegram_caption
     
     if is_empty:
@@ -21,7 +20,7 @@ def update_json():
                 random_captions = json.load(f)
                 final_title = random.choice(random_captions)
         else:
-            final_title = "اذكر الله" # وصف احتياطي جداً
+            final_title = "اذكر الله" 
     else:
         final_title = telegram_caption
 
@@ -41,11 +40,12 @@ def update_json():
         print("الفيديو موجود بالفعل!")
         return
 
-    # 5. إضافة الفيديو الجديد بالوصف النهائي
+    # 5. إضافة الفيديو الجديد بالحقول المطلوبة (تم إضافة likes هنا)
     new_video = {
         "id": str(len(videos) + 1),
         "title": final_title,
-        "url": full_url
+        "url": full_url,
+        "likes": 0  # <--- القيمة الافتراضية بتبدأ بصفر
     }
     videos.append(new_video)
 
@@ -53,7 +53,7 @@ def update_json():
     with open(file_path, 'w', encoding='utf-8') as f:
         json.dump(videos, f, ensure_ascii=False, indent=2)
     
-    print(f"✅ تم إضافة الفيديو بوصف: {final_title}")
+    print(f"✅ تم إضافة الفيديو بوصف: {final_title} وبعدد لايكات 0")
 
 if __name__ == "__main__":
     update_json()
