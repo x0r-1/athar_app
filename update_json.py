@@ -1,18 +1,31 @@
 import json
 import os
-import sys
+import random
 
 def update_json():
-    # استلام البيانات من GitHub Action
+    # 1. استلام البيانات من GitHub Action
     file_id = os.getenv('FILE_ID')
-    title = os.getenv('VIDEO_TITLE')
+    telegram_caption = os.getenv('VIDEO_TITLE')
     
-    # التعديل: لازم السطر ده يكون داخل الفانكشن (جوه الـ def)
     worker_url = "https://yellow-wind-75bb.ahhaga123456789.workers.dev/?file_id="
-    
     file_path = 'videos.json'
+    captions_path = 'captions.json'
 
-    # 1. قراءة البيانات الحالية
+    # 2. تحديد الوصف (من تليجرام أو عشوائي)
+    # نتحقق إذا كان الوصف القادم من العامل (Worker) فارغاً أو جملة تلقائية
+    is_empty = not telegram_caption or telegram_caption.strip() == "" or "فيديو جديد من أثر" in telegram_caption
+    
+    if is_empty:
+        if os.path.exists(captions_path):
+            with open(captions_path, 'r', encoding='utf-8') as f:
+                random_captions = json.load(f)
+                final_title = random.choice(random_captions)
+        else:
+            final_title = "اذكر الله" # وصف احتياطي جداً
+    else:
+        final_title = telegram_caption
+
+    # 3. قراءة بيانات الفيديوهات الحالية
     if os.path.exists(file_path):
         with open(file_path, 'r', encoding='utf-8') as f:
             try:
@@ -22,24 +35,25 @@ def update_json():
     else:
         videos = []
 
-    # 2. التأكد إن الفيديو مش موجود
+    # 4. التأكد من عدم التكرار
     full_url = f"{worker_url}{file_id}"
     if any(v.get('url') == full_url for v in videos):
         print("الفيديو موجود بالفعل!")
         return
 
-    # 3. إضافة الفيديو الجديد
+    # 5. إضافة الفيديو الجديد بالوصف النهائي
     new_video = {
         "id": str(len(videos) + 1),
-        "title": title,
+        "title": final_title,
         "url": full_url
     }
     videos.append(new_video)
 
-    # 4. حفظ التعديلات
+    # 6. حفظ التعديلات
     with open(file_path, 'w', encoding='utf-8') as f:
         json.dump(videos, f, ensure_ascii=False, indent=2)
-    print(f"تم إضافة الفيديو بنجاح: {title}")
+    
+    print(f"✅ تم إضافة الفيديو بوصف: {final_title}")
 
 if __name__ == "__main__":
     update_json()
