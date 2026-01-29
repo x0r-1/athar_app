@@ -1,7 +1,8 @@
 name: Update Video JSON
 on:
   repository_dispatch:
-    types: [new_video]
+    # لازم النوعين دول عشان الـ Worker بيبعتهم
+    types: [new_video_upload, update_like]
 
 permissions:
   contents: write
@@ -9,15 +10,9 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
-    # هنا التعديل: بنسمح بفتح عمليتين مع بعض (Parallel)
-    # والـ group بيضمن إنهم تبع نفس الطابور
     concurrency: 
       group: update-json
       cancel-in-progress: false
-
-    # دي الإضافة اللي بتتحكم في عدد العمليات المتوازية
-    strategy:
-      max-parallel: 2
 
     steps:
       - uses: actions/checkout@v3
@@ -31,9 +26,17 @@ jobs:
           
       - name: Run Update Script
         env:
+          # هنا التعديل: الأسماء لازم تطابق الـ client_payload اللي في الـ Worker
           FILE_ID: ${{ github.event.client_payload.file_id }}
-          VIDEO_TITLE: ${{ github.event.client_payload.title }}
-        run: python update_json.py
+          VIDEO_TITLE: ${{ github.event.client_payload.video_title }}
+          VIDEO_ID: ${{ github.event.client_payload.video_id }}
+          ACTION: ${{ github.event.client_payload.action }}
+        run: |
+          if [ "${{ github.event.action }}" == "new_video_upload" ]; then
+            python update_json.py
+          else
+            python update_video_likes.py "$VIDEO_ID" "$ACTION"
+          fi
         
       - name: Commit and Push changes
         run: |
@@ -41,10 +44,8 @@ jobs:
           git config --global user.email 'action@github.com'
           
           git add videos.json
-          git commit -m "Auto-update: ${{ github.event.client_payload.title }}" || exit 0
+          git commit -m "Auto-update: ${{ github.event.action }}" || exit 0
           
-          # استراتيجية الرفع "المقاتلة":
-          # بيعمل pull ودمج أوتوماتيكي (theirs) عشان لو العملية التانية سبقت في الرفع
           for i in {1..5}; do
             git pull --rebase -X theirs origin main && git push && break || sleep 15;
           done
