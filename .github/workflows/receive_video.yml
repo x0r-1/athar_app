@@ -1,0 +1,33 @@
+name: Athar Video Receiver
+on:
+  repository_dispatch:
+    types: [new_video_upload]
+
+permissions:
+  contents: write
+
+jobs:
+  receive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Create Temp Video File
+        run: |
+          mkdir -p queue
+          # بنعمل ملف JSON صغير لكل فيديو باسم الـ file_id عشان ميتكررش
+          cat <<EOF > queue/${{ github.event.client_payload.file_id }}.json
+          {
+            "title": "${{ github.event.client_payload.video_title }}",
+            "file_id": "${{ github.event.client_payload.file_id }}",
+            "timestamp": $(date +%s)
+          }
+          EOF
+      - name: Commit to Queue
+        run: |
+          git config --global user.name 'Athar Receiver'
+          git config --global user.email 'bot@athar.com'
+          git add queue/
+          git commit -m "New video in queue: ${{ github.event.client_payload.file_id }}"
+          # بنعمل ريبايز عشان لو كذا فيديو وصلوا ورا بعض جيت هاب يقبلهم كلهم
+          git pull --rebase origin main
+          git push
