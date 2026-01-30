@@ -11,32 +11,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
       - name: Create Temp Entry
         run: |
           mkdir -p queue
           EVENT_TYPE="${{ github.event.action }}"
+          TIMESTAMP=$(date +%s)
+          
           if [ "$EVENT_TYPE" == "new_video_upload" ]; then
-            cat <<EOF > queue/vid_${{ github.event.client_payload.file_id }}.json
-            {
-              "file_id": "${{ github.event.client_payload.file_id }}",
-              "video_title": "${{ github.event.client_payload.video_title }}",
-              "timestamp": $(date +%s)
-            }
-            EOF
+            # كتابة بيانات الفيديو الجديد في سطر واحد لتجنب أخطاء EOF
+            echo "{\"file_id\": \"${{ github.event.client_payload.file_id }}\", \"video_title\": \"${{ github.event.client_payload.video_title }}\", \"timestamp\": $TIMESTAMP}" > "queue/vid_${{ github.event.client_payload.file_id }}.json"
+            echo "🚀 تم تسجيل فيديو جديد في الطابور"
+            
           elif [ "$EVENT_TYPE" == "update_like" ]; then
-            cat <<EOF > queue/like_${{ github.event.client_payload.video_id }}_$RANDOM.json
-            {
-              "video_id": "${{ github.event.client_payload.video_id }}",
-              "action": "${{ github.event.client_payload.action }}",
-              "timestamp": $(date +%s)
-            }
-            EOF
+            # كتابة بيانات اللايك في سطر واحد
+            echo "{\"video_id\": \"${{ github.event.client_payload.video_id }}\", \"action\": \"${{ github.event.client_payload.action }}\", \"timestamp\": $TIMESTAMP}" > "queue/like_${{ github.event.client_payload.video_id }}_$RANDOM.json"
+            echo "❤️ تم تسجيل طلب لايك في الطابور"
           fi
+
       - name: Commit & Push to Queue
         run: |
           git config --global user.name 'Athar Receiver'
           git config --global user.email 'bot@athar.com'
           git add queue/
-          git commit -m "New entry in queue" || exit 0
-          git pull --rebase origin main
-          git push
+          git commit -m "New entry in queue: ${{ github.event.action }}" || exit 0
+          
+          # محاولة الرفع مع التكرار لضمان النجاح في حالة الزحمة
+          for i in {1..5}; do
+            git pull --rebase origin main && git push && break || sleep 5
+          done
