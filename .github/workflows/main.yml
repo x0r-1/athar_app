@@ -6,7 +6,6 @@ on:
 permissions:
   contents: write
 
-# الطابور الحديدي: ممنوع أكشن يبدأ غير لما اللي قبله يخلص ويقفل الـ Commit
 concurrency:
   group: athar-lock
   cancel-in-progress: false
@@ -24,26 +23,32 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Sync and Execute
+      - name: Process Video
         run: |
-          # تأكيد مزامنة الملفات قبل البدء
           git config --global user.name 'Athar Bot'
           git config --global user.email 'bot@athar.com'
+          
+          # تأكد من سحب آخر التحديثات قبل البدء
           git pull origin main
-
-          # تنفيذ الكود
-          EVENT_TYPE="${{ github.event.action }}"
-          if [ "$EVENT_TYPE" == "new_video_upload" ]; then
+          
+          # 1. إنشاء الملف المؤقت للفيديو (بواسطة الملف الأول)
+          if [ "${{ github.event.action }}" == "new_video_upload" ]; then
             python update_json.py
-          elif [ "$EVENT_TYPE" == "update_like" ]; then
+          fi
+          
+          # 2. تحديث اللايكات (لو الطلب لايك)
+          if [ "${{ github.event.action }}" == "update_like" ]; then
             python manage_likes.py "${{ github.event.client_payload.video_id }}" "${{ github.event.client_payload.action }}"
           fi
 
-          # حفظ التغييرات مع محاولة الرفع المتكرر
-          git add videos.json
-          git commit -m "Update: $EVENT_TYPE" || exit 0
+          # 3. دمج كل الملفات المؤقتة في الملف الرئيسي (بواسطة الملف الجديد)
+          python merge_videos.py
+
+          # 4. حفظ ورفع التغييرات
+          git add .
+          git commit -m "Update Athar Data" || exit 0
           
-          for i in {1..5}; do
+          for i in {1..10}; do
             git pull --rebase origin main
             git push && break || sleep 5
           done
