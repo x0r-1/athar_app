@@ -9,7 +9,12 @@ permissions:
 jobs:
   process:
     runs-on: ubuntu-latest
-    # شلنا الـ concurrency القديمة عشان هي اللي بتوقع الأكشنز الزيادة
+    # ميزة الـ Concurrency هنا هي "السر"
+    # بتخلي الأكشنز تقف في طابور (Queue) وتشتغل واحد ورا التاني بالترتيب
+    concurrency: 
+      group: athar-db-update
+      cancel-in-progress: false 
+
     steps:
       - uses: actions/checkout@v3
         with:
@@ -27,11 +32,9 @@ jobs:
           VIDEO_TITLE: ${{ github.event.client_payload.video_title }}
           VIDEO_ID: ${{ github.event.client_payload.video_id }}
           ACTION: ${{ github.event.client_payload.action }}
-          EVENT_TYPE: ${{ github.event.action }} # التصليح هنا: استخدم event.action
+          # استخدمنا github.event.action عشان يقرأ نوع الـ Dispatch صح
+          EVENT_TYPE: ${{ github.event.action }}
         run: |
-          # إضافة انتظار عشوائي بسيط لتقليل التصادم في البداية
-          sleep $(( RANDOM % 10 ))
-          
           if [ "$EVENT_TYPE" == "new_video_upload" ]; then
             echo "🚀 جاري إضافة فيديو جديد..."
             python update_json.py
@@ -47,19 +50,18 @@ jobs:
           git config --global user.name 'Athar Bot'
           git config --global user.email 'bot@athar.com'
           
-          # محاولة الحفظ والرفع بشكل متكرر وذكي
+          # محاولة الحفظ والرفع بذكاء
           for i in {1..10}; do
             git add videos.json
-            # لو مفيش تغييرات اخرج بسلام
+            # لو مفيش تغييرات حقيقية اخرج بسلام
             git commit -m "Automated Update: ${{ github.event.action }}" || exit 0
             
-            # محاولة السحب والرفع
+            # السحب (Rebase) ثم الرفع
             if git pull --rebase -X theirs origin main && git push; then
-              echo "✅ تم الحفظ بنجاح في المحاولة رقم $i"
+              echo "✅ تم التحديث بنجاح!"
               exit 0
             else
-              echo "⚠️ فشل الرفع، محاولة جديدة بعد 5 ثواني..."
+              echo "⚠️ تعارض في البيانات، محاولة جديدة بعد 5 ثواني..."
               sleep 5
             fi
           done
-          exit 1
