@@ -1,14 +1,25 @@
 import json
 import os
+import random # ضفنا دي عشان نختار جملة عشوائية
 
 def merge_all():
     main_file = 'videos.json'
     queue_dir = 'queue'
+    captions_file = 'captions.json' # ملف العناوين البديلة
     
     # التأكد من وجود المجلد
     if not os.path.exists(queue_dir) or not os.listdir(queue_dir):
         print("🚀 المجلد فارغ، لا توجد مهام حالياً.")
         return
+
+    # --- تحميل العناوين البديلة ---
+    backup_captions = ["اذكر الله"] # القيمة الافتراضية القصوى
+    if os.path.exists(captions_file):
+        with open(captions_file, 'r', encoding='utf-8') as f:
+            try:
+                backup_captions = json.load(f)
+            except:
+                pass
 
     # 1. قراءة الملف الرئيسي
     if os.path.exists(main_file):
@@ -49,16 +60,11 @@ def merge_all():
                     v['likes'] = max(0, v.get('likes', 0) - 1)
 
     # 4. دمج الفيديوهات الجديدة
-    # استخدام .get لضمان عدم حدوث KeyError لو التايم ستامب مش موجود
     new_video_entries.sort(key=lambda x: x.get('timestamp', 0))
     
     for entry in new_video_entries:
         f_id = entry.get('file_id')
         url = f"https://yellow-wind-75bb.ahhaga123456789.workers.dev/?file_id={f_id}"
-        
-        # # التأكد من عدم التكرار
-        # if any(v.get('url') == url for v in videos):
-        #     continue
         
         # حساب الـ ID الجديد
         try:
@@ -66,8 +72,13 @@ def merge_all():
         except:
             max_id = len(videos)
 
-        # الحل الجذري لمشكلة الـ Title: بيجرب يقرأ title ولو ملهاش بيقرأ video_title
-        final_title = entry.get('title') or entry.get('video_title') or "اذكر الله"
+        # المنطق الجديد للعنوان:
+        # 1. بيشوف title
+        # 2. لو مفيش بيشوف video_title
+        # 3. لو مفيش بيختار جملة عشوائية من captions.json
+        final_title = entry.get('title') or entry.get('video_title')
+        if not final_title:
+            final_title = random.choice(backup_captions)
         
         new_video = {
             "id": str(max_id + 1),
@@ -75,7 +86,6 @@ def merge_all():
             "url": url,
             "likes": 0
         }
-        # إضافة الفيديو في أول القائمة
         videos.insert(0, new_video)
 
     # 5. حفظ وتنظيف
