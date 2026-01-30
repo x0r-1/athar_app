@@ -1,51 +1,53 @@
 import json
 import os
 
-def merge():
+def merge_all():
     main_file = 'videos.json'
-    temp_dir = 'temp_videos'
+    queue_dir = 'queue'
     
+    if not os.path.exists(queue_dir) or not os.listdir(queue_dir):
+        print("المجلد فارغ، لا يوجد شيء لدمجه.")
+        return
+
+    # 1. قراءة الملف الرئيسي
     if os.path.exists(main_file):
         with open(main_file, 'r', encoding='utf-8') as f:
             try: videos = json.load(f)
             except: videos = []
     else: videos = []
 
-    if not os.path.exists(temp_dir): return
+    # 2. قراءة كل الملفات في الطابور
+    new_files = os.listdir(queue_dir)
+    temp_entries = []
+    for filename in new_files:
+        if filename.endswith('.json'):
+            with open(os.path.join(queue_dir, filename), 'r', encoding='utf-8') as f:
+                temp_entries.append(json.load(f))
 
-    temp_files = os.listdir(temp_dir)
-    if not temp_files: return
+    # ترتيبهم بالأقدم أولاً عشان لما نضيفهم يبقوا صح
+    temp_entries.sort(key=lambda x: x['timestamp'])
 
-    new_entries = []
-    for filename in temp_files:
-        path = os.path.join(temp_dir, filename)
-        with open(path, 'r', encoding='utf-8') as f:
-            new_entries.append(json.load(f))
+    # 3. الدمج وإعطاء IDs
+    for entry in temp_entries:
+        url = f"https://yellow-wind-75bb.ahhaga123456789.workers.dev/?file_id={entry['file_id']}"
+        if any(v['url'] == url for v in videos): continue
 
-    # الترتيب حسب وقت الرفع
-    new_entries.sort(key=lambda x: x['timestamp'])
-
-    for entry in new_entries:
-        if any(v['url'] == entry['url'] for v in videos):
-            continue
-            
-        # حساب ID عددي صحيح بناءً على أكبر ID موجود
         max_id = max([int(v['id']) for v in videos if str(v['id']).isdigit()] + [0])
         
-        final_video = {
+        new_video = {
             "id": str(max_id + 1),
-            "title": entry['title'],
-            "url": entry['url'],
-            "likes": entry['likes']
+            "title": entry['title'] if entry['title'] else "اذكر الله",
+            "url": url,
+            "likes": 0
         }
-        videos.insert(0, final_video)
+        videos.insert(0, new_video)
 
+    # 4. حفظ وتنظيف
     with open(main_file, 'w', encoding='utf-8') as f:
         json.dump(videos, f, ensure_ascii=False, indent=2)
     
-    # مسح الملفات المؤقتة بعد الدمج
-    for filename in temp_files:
-        os.remove(os.path.join(temp_dir, filename))
+    for filename in new_files:
+        os.remove(os.path.join(queue_dir, filename))
 
 if __name__ == "__main__":
-    merge()
+    merge_all()
