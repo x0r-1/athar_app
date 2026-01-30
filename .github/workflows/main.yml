@@ -9,14 +9,12 @@ permissions:
 jobs:
   process:
     runs-on: ubuntu-latest
-    concurrency: 
-      group: athar-db-update
-      cancel-in-progress: false
-
+    # شلنا الـ concurrency القديمة عشان هي اللي بتوقع الأكشنز الزيادة
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -29,25 +27,39 @@ jobs:
           VIDEO_TITLE: ${{ github.event.client_payload.video_title }}
           VIDEO_ID: ${{ github.event.client_payload.video_id }}
           ACTION: ${{ github.event.client_payload.action }}
-          EVENT_NAME: ${{ github.event.action }}
+          EVENT_TYPE: ${{ github.event.action }} # التصليح هنا: استخدم event.action
         run: |
-          if [ "$EVENT_NAME" == "new_video_upload" ]; then
+          # إضافة انتظار عشوائي بسيط لتقليل التصادم في البداية
+          sleep $(( RANDOM % 10 ))
+          
+          if [ "$EVENT_TYPE" == "new_video_upload" ]; then
             echo "🚀 جاري إضافة فيديو جديد..."
             python update_json.py
-          elif [ "$EVENT_NAME" == "update_like" ]; then
+          elif [ "$EVENT_TYPE" == "update_like" ]; then
             echo "❤️ جاري تحديث لايكات الفيديو رقم $VIDEO_ID..."
             python manage_likes.py "$VIDEO_ID" "$ACTION"
           else
-            echo "❓ نوع الحدث غير معروف: $EVENT_NAME"
+            echo "❓ نوع الحدث غير معروف: $EVENT_TYPE"
           fi
 
-      - name: Save Changes
+      - name: Save Changes with Retry Logic
         run: |
           git config --global user.name 'Athar Bot'
           git config --global user.email 'bot@athar.com'
-          git add videos.json
-          git commit -m "Automated Update: ${{ github.event.action }}" || exit 0
           
-          for i in {1..5}; do
-            git pull --rebase -X theirs origin main && git push && break || sleep 10;
+          # محاولة الحفظ والرفع بشكل متكرر وذكي
+          for i in {1..10}; do
+            git add videos.json
+            # لو مفيش تغييرات اخرج بسلام
+            git commit -m "Automated Update: ${{ github.event.action }}" || exit 0
+            
+            # محاولة السحب والرفع
+            if git pull --rebase -X theirs origin main && git push; then
+              echo "✅ تم الحفظ بنجاح في المحاولة رقم $i"
+              exit 0
+            else
+              echo "⚠️ فشل الرفع، محاولة جديدة بعد 5 ثواني..."
+              sleep 5
+            fi
           done
+          exit 1
